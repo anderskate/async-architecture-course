@@ -210,6 +210,8 @@ class ChangeUserRole(Resource):
         args = parser.parse_args()
         new_role = args.get('role')
         user = user_datastore.get_user(identifier=int(user_id))
+        if not user:
+            return {'info': 'User not found', 'status': 'error'}
         user.role = new_role
         db.session.commit()
 

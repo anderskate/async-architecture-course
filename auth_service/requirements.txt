@@ -12,3 +12,5 @@ aiokafka==0.7.2
 psycopg2-binary==2.9.3
 SQLAlchemy-Utils==0.38.2
 loguru==0.6.0
+databases==0.5.5
+asyncpg==0.25.0

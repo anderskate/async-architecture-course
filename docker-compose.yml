@@ -1,6 +1,15 @@
 version: '3.4'
 
 services:
+  db_auth:
+    image: postgres:12-alpine
+    ports:
+      - "5432:5432"
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
   broker:
     image: confluentinc/cp-server:7.0.0
     hostname: broker

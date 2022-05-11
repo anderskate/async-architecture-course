@@ -3,6 +3,9 @@ import json
 from fastapi import APIRouter
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import update
 from loguru import logger
 
 from config import (
@@ -22,20 +25,29 @@ engine = create_async_engine(DATABASE_URL)
 async def _update_user(data: dict):
     data.pop('id')
     user_public_id = data.get('public_id')
-    async with engine.begin() as connection:
-        query = User.update().where(
-            User.c.public_id == user_public_id
-        ).values(**data)
-        await connection.execute(query)
-        logger.info(data)
+    async_session = sessionmaker(
+        engine, expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    query = update(User).where(User.public_id == user_public_id).values(**data)
+    async with async_session() as session:
+        await session.execute(query)
+        await session.commit()
+    logger.info(data)
 
 
 async def _create_new_user(data: dict):
     data.pop('id')
-    async with engine.begin() as connection:
-        query = User.insert().values(**data)
-        await connection.execute(query)
-        logger.info(data)
+
+    async_session = sessionmaker(
+        engine, expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    new_user = User(**data)
+    async with async_session() as session:
+        session.add(new_user)
+        await session.commit()
+    logger.info(data)
 
 
 async def consume():

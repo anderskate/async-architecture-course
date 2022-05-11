@@ -1,16 +1,21 @@
 import asyncio
 import random
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.future import select
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer
+from auth_jwt_lib.main import check_token
+
 
 import router
 from models import Task, User
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 DATABASE_URL = 'postgresql+asyncpg://postgres:postgres@localhost:5433/tracker'
@@ -20,12 +25,22 @@ engine = create_async_engine(DATABASE_URL)
 app = FastAPI()
 
 
+async def verify_token(
+        jwt_token: str = Depends(oauth2_scheme),
+):
+    """Verify token with extended custom module - auth_jwt_lib."""
+    try:
+        check_token(jwt_token)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
 class TaskIn(BaseModel):
     description: str
     user_id: str
 
 
-@app.post('/tasks')
+@app.post('/tasks', dependencies=[Depends(verify_token)])
 async def create_new_task(task: TaskIn):
     async_session = sessionmaker(
         engine, expire_on_commit=False,
@@ -46,7 +61,7 @@ async def create_new_task(task: TaskIn):
     return {**task.dict()}
 
 
-@app.patch('/tasks/{task_id}/complete')
+@app.patch('/tasks/{task_id}/complete', dependencies=[Depends(verify_token)])
 async def complete_task(task_id: int):
     async_session = sessionmaker(
         engine, expire_on_commit=False,
@@ -66,7 +81,7 @@ async def complete_task(task_id: int):
     return {'info': 'task status updated', 'status': 'ok'}
 
 
-@app.patch('/tasks/shuffle')
+@app.patch('/tasks/shuffle', dependencies=[Depends(verify_token)])
 async def shuffle_all_tasks():
     async_session = sessionmaker(
         engine, expire_on_commit=False,

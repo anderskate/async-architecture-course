@@ -35,7 +35,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@localhos
 app.config['SECURITY_PASSWORD_SALT'] = 'fe2rwgergrehe'
 app.config['SECURITY_SEND_REGISTER_EMAIL'] = False
 app.config['JWT_SECRET_KEY'] = 'erwgerwgrewg'
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 1
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 60 * 5
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 24
 
 jwt = JWTManager(app)
@@ -172,9 +172,8 @@ class Login(Resource):
         save_refresh - save refresh token in redis
         save_log - save log for user login
         """
-
         access_token = create_access_token(
-            identity=user.id, additional_claims={'permissions': 0}
+            identity=user.id, additional_claims={'role': user.role}
         )
         refresh_token = create_refresh_token(identity=user.id)
         return {

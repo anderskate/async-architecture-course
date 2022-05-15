@@ -1,7 +1,7 @@
 import uuid
 
 import sqlalchemy
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy_utils import database_exists, create_database
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
@@ -32,7 +32,13 @@ class Task(Base):
     public_id = Column(UUID(as_uuid=True), default=uuid.uuid4)
     status = Column('status', String(255), server_default='assigned')
     description = Column(String(255))
+    jira_id = Column(String(255), unique=True)
     user_id = Column(Integer, ForeignKey('user.id'))
+
+    @validates
+    def validate_description(self, key, value):
+        assert any(symbol in '[]' for symbol in value)
+        return value
 
 
 engine = sqlalchemy.create_engine(DATABASE_URL)

@@ -35,7 +35,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@localhos
 app.config['SECURITY_PASSWORD_SALT'] = 'fe2rwgergrehe'
 app.config['SECURITY_SEND_REGISTER_EMAIL'] = False
 app.config['JWT_SECRET_KEY'] = 'erwgerwgrewg'
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 60 * 5
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 60 * 60
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 24
 
 jwt = JWTManager(app)

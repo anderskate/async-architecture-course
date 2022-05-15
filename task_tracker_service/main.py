@@ -1,25 +1,40 @@
 import asyncio
 import random
+import json
 
 from fastapi import FastAPI, HTTPException, Depends
+from kafka import KafkaProducer
 from sqlalchemy.future import select
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import class_mapper
 from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordBearer
 from auth_jwt_lib.main import check_token
+from loguru import logger
 
 
 import router
 from models import Task, User
+from constants import TaskEvents
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 DATABASE_URL = 'postgresql+asyncpg://postgres:postgres@localhost:5433/tracker'
 engine = create_async_engine(DATABASE_URL)
+
+# Set Kafka Producer
+producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
+
+def asdict(obj):
+    """Convert sqlalchemy model objects to dict."""
+    return dict(
+        (col.name, getattr(obj, col.name))
+        for col in class_mapper(obj.__class__).mapped_table.c
+    )
 
 
 app = FastAPI()
@@ -57,6 +72,17 @@ async def create_new_task(task: TaskIn):
         new_task = Task(description=task.description, user_id=user.id)
         session.add(new_task)
         await session.commit()
+        await session.refresh(new_task)
+
+    # Send event to Kafka that new new task created
+    event = {
+        'event_name': TaskEvents.TASK_CREATED.value, 'data': asdict(new_task)
+    }
+    producer.send(
+        topic='tasks-stream',
+        value=json.dumps(event, default=str).encode('utf-8')
+    )
+    logger.info(event)
 
     return {**task.dict()}
 
@@ -78,6 +104,16 @@ async def complete_task(task_id: int):
             status='completed')
         await session.execute(query)
         await session.commit()
+
+    # Send event to Kafka that task completed
+    event = {
+        'event_name': TaskEvents.TASK_COMPLETED.value, 'data': asdict(task)
+    }
+    producer.send(
+        topic='tasks-stream',
+        value=json.dumps(event, default=str).encode('utf-8')
+    )
+    logger.info(event)
     return {'info': 'task status updated', 'status': 'ok'}
 
 
@@ -102,6 +138,18 @@ async def shuffle_all_tasks():
             ).values(user_id=random_user.id)
             await session.execute(query)
         await session.commit()
+
+        for task in tasks:
+            # Send event to Kafka that task assigned to the new user
+            event = {
+                'event_name': TaskEvents.TASK_ASSIGNED.value,
+                'data': asdict(task[0])
+            }
+            producer.send(
+                topic='tasks-stream',
+                value=json.dumps(event, default=str).encode('utf-8')
+            )
+            logger.info(event)
 
         return {'info': 'All tasks shuffled', 'status': 'ok'}
 

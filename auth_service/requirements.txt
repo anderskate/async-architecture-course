@@ -14,3 +14,4 @@ SQLAlchemy-Utils==0.38.2
 loguru==0.6.0
 databases==0.5.5
 asyncpg==0.25.0
+jsonschema==4.5.1

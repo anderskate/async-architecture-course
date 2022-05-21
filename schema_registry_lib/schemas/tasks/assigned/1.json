@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "event_name": {
+      "type": "string"
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "public_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "public_id",
+        "status",
+        "description",
+        "user_id"
+      ]
+    }
+  },
+  "required": [
+    "event_name",
+    "data"
+  ]
+}

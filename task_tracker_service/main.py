@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordBearer
 from auth_jwt_lib.main import check_token
 from loguru import logger
+from schema_registry_lib.schema_registry import SchemaRegistry
 
 
 import router
@@ -55,7 +56,10 @@ class TaskIn(BaseModel):
     user_id: str
 
 
-@app.post('/tasks', dependencies=[Depends(verify_token)])
+schema = SchemaRegistry()
+
+
+@app.post('/tasks')
 async def create_new_task(task: TaskIn):
     async_session = sessionmaker(
         engine, expire_on_commit=False,
@@ -75,9 +79,19 @@ async def create_new_task(task: TaskIn):
         await session.refresh(new_task)
 
     # Send event to Kafka that new new task created
+    new_task.user_id = user.public_id
     event = {
-        'event_name': TaskEvents.TASK_CREATED.value, 'data': asdict(new_task)
+        'event_id': '',
+        'event_version': '',
+        'event_time': '',
+        'producer': '',
+        'event_name': TaskEvents.TASK_CREATED.value,
+        'data': asdict(new_task),
+
     }
+
+    # validated_event = schema.validate_event(event, 'tasks.created', 1)
+    # if validated_event:
     producer.send(
         topic='tasks-stream',
         value=json.dumps(event, default=str).encode('utf-8')
@@ -87,7 +101,7 @@ async def create_new_task(task: TaskIn):
     return {**task.dict()}
 
 
-@app.patch('/tasks/{task_id}/complete', dependencies=[Depends(verify_token)])
+@app.patch('/tasks/{task_id}/complete')
 async def complete_task(task_id: int):
     async_session = sessionmaker(
         engine, expire_on_commit=False,
@@ -109,6 +123,8 @@ async def complete_task(task_id: int):
     event = {
         'event_name': TaskEvents.TASK_COMPLETED.value, 'data': asdict(task)
     }
+    # validated_event = schema.validate_event(event, 'tasks.completed', 1)
+    # if validated_event:
     producer.send(
         topic='tasks-stream',
         value=json.dumps(event, default=str).encode('utf-8')
@@ -117,7 +133,7 @@ async def complete_task(task_id: int):
     return {'info': 'task status updated', 'status': 'ok'}
 
 
-@app.patch('/tasks/shuffle', dependencies=[Depends(verify_token)])
+@app.patch('/tasks/shuffle')
 async def shuffle_all_tasks():
     async_session = sessionmaker(
         engine, expire_on_commit=False,
@@ -141,10 +157,19 @@ async def shuffle_all_tasks():
 
         for task in tasks:
             # Send event to Kafka that task assigned to the new user
+            user_query = select(User).where(
+                User.id == task[0].user_id)
+            result = await session.execute(user_query)
+            user = result.scalar()
+
+            task_data = asdict(task[0])
+            task_data['user_id'] = user.public_id
             event = {
                 'event_name': TaskEvents.TASK_ASSIGNED.value,
-                'data': asdict(task[0])
+                'data': task_data
             }
+            # validated_event = schema.validate_event(event, 'tasks.assigned', 1)
+            # if validated_event:
             producer.send(
                 topic='tasks-stream',
                 value=json.dumps(event, default=str).encode('utf-8')
